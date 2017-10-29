@@ -22,23 +22,34 @@ THE SOFTWARE.
 
 # For a complete discussion, see http://www.makermusings.com
 import os
-import gc
-import urequests
-import uselect
-import usocket
-import struct
+from uos import uname
 import sys
 import time
-import timeutils
-import urllib
 import machine
 import network
-
 import _thread
+
+import gc
+try:
+    import uselect as select
+except:
+    import socket
+try:
+    import usocket as socket
+except:
+    import socket
+try:
+    import ustruct as struct
+except:
+    import struct
 
 # for ws2812b
 from ws2812 import WS2812
 
+try:
+    from machine import RTC
+except:
+    from timeutils import RTC
 
 # This XML is the minimum needed to define one of our virtual switches
 # to the Amazon Echo
@@ -57,13 +68,14 @@ SETUP_XML = """<?xml version="1.0"?>
 """
 
 
-DEBUG = False
+DEBUG = True
 INADDR_ANY = 0
 global_epoch = 0        # time over ntp-server
 
 # W2812b
 ledNumber = 144         # number of leds
 chain = []
+clock = None
 
 def dbg(msg):
     global DEBUG
@@ -74,23 +86,31 @@ def inet_aton(addr):
     ip_as_bytes = bytes(map(int, addr.split('.')))
     return ip_as_bytes
 
+def format_timetuple_and_zone(timetuple, zone):
+    return '%s, %02d %s %04d %02d:%02d:%02d %s' % (
+        ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][timetuple[6]],
+        timetuple[2],
+        ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][timetuple[1] - 1],
+        timetuple[0], timetuple[3], timetuple[4], timetuple[5],
+        zone)
+
 # A simple utility class to wait for incoming data to be
 # read on a socket.
 class poller:
     def __init__(self):
-        if 'poll' in dir(uselect):
+        if 'poll' in dir(select):
             self.use_poll = True
-            self.poller = uselect.poll()
+            self.poller = select.poll()
         else:
             self.use_poll = False
         self.targets = {}
-        global_epoch = timeutils.epoch()
 
     def add(self, target, socket = None):
         if not socket:
             socket = target.sockets()
         if self.use_poll:
-            self.poller.register(socket, uselect.POLLIN)
+            self.poller.register(socket, select.POLLIN)
         #dbg("add device on fileno: %s" % socket.fileno() )
         self.targets[socket.fileno()] = target
         #dbg("size targets: %s" % len(self.targets))
@@ -110,7 +130,7 @@ class poller:
         else:
             ready = []
             if len(self.targets) > 0:
-                (rlist, wlist, xlist) = uselect.select(self.targets.keys(), [], [], timeout)
+                (rlist, wlist, xlist) = select.select(self.targets.keys(), [], [], timeout)
                 ready = [(x, None) for x in rlist]
 
         for one_ready in ready:
@@ -124,7 +144,6 @@ class poller:
 # Base class for a generic UPnP device. This is far from complete
 # but it supports either specified or automatic IP address and port
 # selection.
-
 class upnp_device:
     this_host_ip = None
 
@@ -155,7 +174,7 @@ class upnp_device:
             else:
                 self.ip_address = upnp_device.local_ip_address()
 
-            self.socket = usocket.socket(usocket.AF_INET, usocket.SOCK_STREAM)
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.bind((self.ip_address, self.port))
             self.socket.listen(5)
             if self.port == 0:
@@ -201,7 +220,7 @@ class upnp_device:
 
     def respond_to_search(self, destination, search_target):
         dbg("Responding to search for %s" % self.get_name())
-        date_str = timeutils.formatdate(global_epoch)
+        date_str = format_timetuple_and_zone(clock.gmtime(), 'GMT')
         location_url = self.root_url % {'ip_address' : self.ip_address, 'port' : self.port}
         message = ("HTTP/1.1 200 OK\r\n"
                   "CACHE-CONTROL: max-age=86400\r\n"
@@ -219,7 +238,7 @@ class upnp_device:
         message += "\r\n"
 
         try:
-            temp_socket = usocket.socket(usocket.AF_INET,usocket.SOCK_DGRAM)
+            temp_socket = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
             #print("temp_socket %s" % temp_socket.fileno())
             #print("destination" + str(destination) + "message" + message)
             temp_socket.sendto(message, destination)
@@ -255,7 +274,8 @@ class fauxmo(upnp_device):
         if data.find(b'GET /setup.xml HTTP/1.1') == 0:
             dbg("Responding to setup.xml for %s" % self.name)
             xml = SETUP_XML % {'device_name' : self.name, 'device_serial' : self.serial}
-            date_str = timeutils.formatdate(global_epoch)
+            date_str = format_timetuple_and_zone(clock.gmtime(), 'GMT')
+
             message = ("HTTP/1.1 200 OK\r\n"
                        "CONTENT-LENGTH: %d\r\n"
                        "CONTENT-TYPE: text/xml\r\n"
@@ -284,7 +304,7 @@ class fauxmo(upnp_device):
                 # The echo is happy with the 200 status code and doesn't
                 # appear to care about the SOAP response body
                 soap = ""
-                date_str = timeutils.formatdate(global_epoch)
+                date_str = format_timetuple_and_zone(clock.gmtime(), 'GMT')
                 message = ("HTTP/1.1 200 OK\r\n"
                            "CONTENT-LENGTH: %d\r\n"
                            "CONTENT-TYPE: text/xml charset=\"utf-8\"\r\n"
@@ -329,16 +349,16 @@ class upnp_broadcast_responder:
             #This is needed to join a multicast group
             self.mreq = struct.pack("4sl",inet_aton(self.ip), INADDR_ANY)
             #Set up server socket
-            self.ssock = usocket.socket(usocket.AF_INET,usocket.SOCK_DGRAM)
-            self.ssock.setsockopt(usocket.SOL_SOCKET,usocket.SO_REUSEADDR,1)
+            self.ssock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+            self.ssock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
             try:
                 self.ssock.bind(('',self.port))
             except Exception as e:
                 dbg("WARNING: Failed to bind %s:%d: %s" , (self.ip,self.port,e))
                 ok = False
             try:
-                #dbg("IP: " + str(usocket.IPPROTO_IP) + " IP_ADD_MEMBERSHIP: " + str(usocket.IP_ADD_MEMBERSHIP) + " mreq: " + str(self.mreq) )
-                self.ssock.setsockopt(usocket.IPPROTO_IP,usocket.IP_ADD_MEMBERSHIP,self.mreq)
+                #dbg("IP: " + str(socket.IPPROTO_IP) + " IP_ADD_MEMBERSHIP: " + str(socket.IP_ADD_MEMBERSHIP) + " mreq: " + str(self.mreq) )
+                self.ssock.setsockopt(socket.IPPROTO_IP,socket.IP_ADD_MEMBERSHIP,self.mreq)
             except Exception as e:
                 dbg('WARNING: Failed to join multicast group!: ' + str(e))
                 ok = False
@@ -368,7 +388,7 @@ class upnp_broadcast_responder:
     def recvfrom(self,size):
         if self.TIMEOUT:
             self.ssock.setblocking(0)
-            ready = uselect.select([self.ssock], [], [], self.TIMEOUT)[0]
+            ready = select.select([self.ssock], [], [], self.TIMEOUT)[0]
         else:
             self.ssock.setblocking(1)
             ready = True
@@ -443,6 +463,7 @@ class InvalidPortException(Exception):
 
 def thread_echo(args):
     global DEBUG
+    global clock
     global ws2812_chain
     # Set up our singleton for polling the sockets for data ready
 
@@ -453,21 +474,21 @@ def thread_echo(args):
     # 16 switches it can control. Only the first 16 elements of the 'devices'
     # list will be used.
     devices = [
-        {"description": "white lights",
+        {"description": "white led",
          "port": 12340,
          "handler": rest_api_handler((255,255,255), 50)},
-        {"description": "red lights",
+        {"description": "red led",
          "port": 12341,
          "handler": rest_api_handler((255,0,0), 50)},
-        {"description": "blue lights",
+        {"description": "blue led",
          "port": 12342,
          "handler": rest_api_handler((30,144,255), 90)},
-        {"description": "green lights",
-          "port": 12343,
-          "handler": rest_api_handler((0,255,0), 90)},
-	    {"description": "orange lights",
-		  "port": 12345,
-		  "handler": rest_api_handler((255,165,0), 90)},
+    #     {"description": "green led",
+    #       "port": 12343,
+    #       "handler": rest_api_handler((0,255,0), 90)},
+    #    {"description": "orange led",
+    #     "port": 12345,
+    #     "handler": rest_api_handler((255,165,0), 90)},
     ]
 
     # Set up our singleton listener for UPnP broadcasts
@@ -489,6 +510,16 @@ def thread_echo(args):
             raise InvalidPortException("Invalid port of type: {}, with a value of: {}".format(type(device["port"]), device["port"]))
         fauxmo(device["description"], u, p, None, device["port"], action_handler = device["handler"])
 
+    # setting the clock using ntp
+
+    if  uname().machine == 'WiPy with ESP32': # Wipy 2.0
+        clock_tmp = RTC()
+        clock_tmp.ntp_sync('time1.google.com')
+        clock = time    #gmtime function needed
+    elif uname().machine == 'ESP32 module with ESP32': # Wemos ESP-WROOM-32
+        clock = RTC()   #gmtime function needed
+        clock.ntp_sync('time1.google.com')
+
     dbg("Entering main loop\n")
     while True:
         try:
@@ -499,7 +530,6 @@ def thread_echo(args):
         except Exception as e:
             dbg(e)
             break
-
 
 dbg("Starting echo service on separated thread\n")
 _thread.start_new_thread(thread_echo, ('',))
