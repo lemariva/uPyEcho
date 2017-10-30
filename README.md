@@ -1,5 +1,5 @@
 # uPyEcho
-Emulated Belkin WeMo devices that works with Amazon Echo using a MicroPython 
+Emulated Belkin WeMo device that works with Amazon Echo using a MicroPython 
 
 About the repository
 ---------
