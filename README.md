@@ -58,7 +58,7 @@ Credits
 
 More Info:
 ---------
-* [MicrPython for ESP32](http://micropython.org/download#esp32)
+* [MicroPython for ESP32](http://micropython.org/download#esp32)
 * [MicroPython Tutorial](https://lemariva.com/blog/2017/10/micropython-getting-started)
 * [Universal Plug&Play](https://en.wikipedia.org/wiki/Universal_Plug_and_Play)
 * [Node-red WEMO Emulator](http://flows.nodered.org/node/node-red-contrib-wemo-emulator)
