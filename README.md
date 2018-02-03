@@ -1,10 +1,15 @@
 # uPyEcho
-Emulated Belkin WeMo device that works with Amazon Echo using a MicroPython 
+Emulated Belkin WeMo device that works with Amazon Echo using a MicroPython
 
 About the repository
 ---------
 This repository is based on [makermusings/fauxmo](https://github.com/makermusings/fauxmo) and it was ported to work on MicroPython.
-This code emulates one or more Belkin WEMO type devices in software, and allows you to control them using an Amazon Echo. The code was tested on a ESP32 (WeMos board). You do not need to use AWS Lambda, or ngrok or open a port on your router. Amazon Echo searches for Belkin WEMO devices on the local network and using this code the WeMos board responds to the search request. For more information, please read [this article](https://goo.gl/ccpGhL).
+This code emulates one or more Belkin WEMO type devices in software, and allows you to control them using an Amazon Echo.
+The code was tested on:
+* ESP32 (WeMos board).
+* Amazon Echo Dot (2nd Generation) - revision 1.1 should work with all the versions of Amazon Echo.
+
+You do not need to use AWS Lambda, or ngrok or open a port on your router. Amazon Echo searches for Belkin WEMO devices on the local network and using this code the WeMos board responds to the search request. For more information, please read [this article](https://goo.gl/ccpGhL).
 
 Video
 ---------
@@ -23,7 +28,7 @@ Instructions
 * Install MicroPython on the ESP32, you can use [this tutorial](https://lemariva.com/blog/2017/10/micropython-getting-started);
 * Modify the following lines in the `boot.py`
   * ssid_ = `<your ssid>`
-  * wp2_pass = `<your wpa2 password>` 
+  * wp2_pass = `<your wpa2 password>`
 * Modify the `main.py` file if you want to:
   * The code line
   ```python
@@ -35,7 +40,7 @@ Instructions
     devices = [
         {"description": "white led",
          "port": 12340,
-         "handler": rest_api_handler((255,255,255), 50)}, 
+         "handler": rest_api_handler((255,255,255), 50)},
          ... ]
     ```
 	define the devices that are going to be found by Amazon Echo. Please read [this article](https://goo.gl/ccpGhL) for more information;
@@ -46,7 +51,8 @@ Instructions
 
 Changelog
 ---------
-* Revision: 1.0
+* Revision: 1.1 - Code cleaned and added support for Amazon Echo (2nd Generation) using [this info](https://github.com/kakopappa/arduino-esp8266-alexa-multiple-wemo-switch/issues/22).
+* Revision: 1.0 - Initial commit
 
 License
 --------
