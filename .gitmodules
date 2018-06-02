@@ -1,6 +1,7 @@
-[submodule "ESP32-MicroPython"]
-	path = ESP32-MicroPython
-	url = https://github.com/lemariva/ESP32-MicroPython
+[submodule "ESP32MicroPython"]
+	path = ESP32MicroPython
+	url = https://github.com/lemariva/ESP32MicroPython
 [submodule "wipy-WS2812"]
 	path = wipy-WS2812
 	url = https://github.com/lemariva/wipy-WS2812.git
+
