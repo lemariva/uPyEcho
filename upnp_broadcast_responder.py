@@ -8,6 +8,7 @@ try:
     import usocket as socket
 except:
     import socket
+import time
 
 class UpnpBroadcastResponder:
     '''

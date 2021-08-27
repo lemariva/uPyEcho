@@ -1,4 +1,5 @@
-DEBUG = True
+from global_data import DEBUG
+
 def dbg(msg):
     global DEBUG
     if DEBUG:
