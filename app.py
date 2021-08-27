@@ -9,7 +9,7 @@ from wipyWS2812.ws2812 import WS2812
 from poller import Poller
 from upnp_broadcast_responder import UpnpBroadcastResponder
 from rest_api_handler import RestApiHandler
-from helpers import dbg
+from helpers import dbg, clock
 from devices import devices
 from global_data import ledNumber
 from fauxmo import Fauxmo
@@ -51,16 +51,16 @@ def thread_echo(args):
             action_handler=device["handler"],
         )
 
-    # setting the clock using ntp
-    if uname().machine == "WiPy with ESP32":
-        # Wipy 2.0
-        clock_tmp = RTC()
-        clock_tmp.ntp_sync("time1.google.com")
-        clock = time  # gmtime function needed
-    elif uname().machine == "ESP32 module with ESP32":
-        # Wemos ESP-WROOM-32
-        clock = RTC()  # gmtime function needed
-        clock.ntp_sync("time1.google.com")
+    # # setting the clock using ntp
+    # if uname().machine == "WiPy with ESP32":
+    #     # Wipy 2.0
+    #     clock_tmp = RTC()
+    #     clock_tmp.ntp_sync("time1.google.com")
+    #     clock = time  # gmtime function needed
+    # elif uname().machine == "ESP32 module with ESP32":
+    #     # Wemos ESP-WROOM-32
+    #     clock = RTC()  # gmtime function needed
+    #     clock.ntp_sync("time1.google.com")
 
     dbg("Entering main loop\n")
     while True:

@@ -4,7 +4,7 @@ except:
     import socket
 import uselect as select
 from helpers import dbg
-
+import gc
 class Poller:
     # A simple utility class to wait for incoming data to be
     # read on a socket.

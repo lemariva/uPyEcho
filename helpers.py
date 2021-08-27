@@ -1,4 +1,12 @@
 from global_data import DEBUG
+from uos import uname
+try:
+    from machine import RTC
+    if not hasattr(RTC, "ntp_sync"):
+        from ESP32MicroPython.timeutils import RTC
+except:
+    from ESP32MicroPython.timeutils import RTC
+import time
 
 def dbg(msg):
     global DEBUG
@@ -33,3 +41,18 @@ def format_timetuple_and_zone(timetuple, zone):
         timetuple[5],
         zone,
     )
+
+def get_clock():
+    # setting the clock using ntp
+    if uname().machine == "WiPy with ESP32":
+        # Wipy 2.0
+        clock_tmp = RTC()
+        clock_tmp.ntp_sync("time1.google.com")
+        clock = time  # gmtime function needed
+    elif uname().machine == "ESP32 module with ESP32":
+        # Wemos ESP-WROOM-32
+        clock = RTC()  # gmtime function needed
+        clock.ntp_sync("time1.google.com")
+    return clock
+
+clock = get_clock()

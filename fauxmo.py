@@ -1,6 +1,6 @@
 from upnp_device import UpnpDevice
 from xmls import GET_BINARY_STATE_SOAP, EVENT_SERVICE_XML, SETUP_XML
-from helpers import dbg, format_timetuple_and_zone
+from helpers import dbg, format_timetuple_and_zone, clock
 
 class Fauxmo(UpnpDevice):
     '''
